@@ -1,0 +1,28 @@
+# Go
+bin/
+dist/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# VSCode
+.vscode/
+
+# Environment
+.env
+
+# Logs
+*.log
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Docker
+postgres_data/
