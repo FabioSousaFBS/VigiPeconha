@@ -22,7 +22,10 @@ func main() {
 	router := gin.Default()
 
 	authRepository := auth.NewPostgresRepository(db)
-	authService := auth.NewService(authRepository)
+	authService := auth.NewService(
+		authRepository,
+		cfg.JWTSecret,
+	)
 	authHandler := auth.NewHandler(authService)
 
 	auth.RegisterRoutes(router, authHandler)

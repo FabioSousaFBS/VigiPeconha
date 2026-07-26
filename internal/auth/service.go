@@ -20,11 +20,13 @@ type Service interface {
 
 type AuthService struct {
 	repository Repository
+	jwtSecret  string
 }
 
-func NewService(repository Repository) Service {
+func NewService(repository Repository, jwtSecret string) Service {
 	return &AuthService{
 		repository: repository,
+		jwtSecret:  jwtSecret,
 	}
 }
 
@@ -110,11 +112,12 @@ func (s *AuthService) Login(
 		"sub":   user.ID,
 		"email": user.Email,
 		"role":  user.Role,
+		"iat":   time.Now().Unix(),
 		"exp":   time.Now().Add(24 * time.Hour).Unix(),
 	})
 
 	tokenString, err := token.SignedString(
-		[]byte("vigipeconha-secret"),
+		[]byte(s.jwtSecret),
 	)
 
 	if err != nil {

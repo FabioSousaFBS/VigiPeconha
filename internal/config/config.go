@@ -28,7 +28,10 @@ func Load() Config {
 		DBPass:    getEnv("DB_PASSWORD", "admin123"),
 		DBName:    getEnv("DB_NAME", "vigipeconha"),
 		DBSSLMode: getEnv("DB_SSL_MODE", "disable"),
-		JWTSecret: getEnv("JWT_SECRET", "vigipeconha-secret"),
+		JWTSecret: getEnv(
+			"JWT_SECRET",
+			"vigipeconha-development-secret",
+		),
 	}
 }
 
