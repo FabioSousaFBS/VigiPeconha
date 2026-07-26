@@ -8,6 +8,7 @@ import (
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/auth"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/config"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/database"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/users"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,13 +23,23 @@ func main() {
 	router := gin.Default()
 
 	authRepository := auth.NewPostgresRepository(db)
+
 	authService := auth.NewService(
 		authRepository,
 		cfg.JWTSecret,
 	)
+
 	authHandler := auth.NewHandler(authService)
 
 	auth.RegisterRoutes(router, authHandler)
+
+	usersHandler := users.NewHandler()
+
+	users.RegisterRoutes(
+		router,
+		usersHandler,
+		cfg.JWTSecret,
+	)
 
 	router.GET("/health", func(c *gin.Context) {
 		err := db.Ping(ctx)
