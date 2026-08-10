@@ -99,6 +99,10 @@ func (s *AuthService) Login(
 		return nil, errors.New("usuário ou senha inválidos")
 	}
 
+	if user.Status != "active" {
+		return nil, errors.New("usuário inativo")
+	}
+
 	err = bcrypt.CompareHashAndPassword(
 		[]byte(user.PasswordHash),
 		[]byte(input.Password),
@@ -108,13 +112,19 @@ func (s *AuthService) Login(
 		return nil, errors.New("usuário ou senha inválidos")
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
 		"sub":   user.ID,
 		"email": user.Email,
 		"role":  user.Role,
 		"iat":   time.Now().Unix(),
 		"exp":   time.Now().Add(24 * time.Hour).Unix(),
-	})
+	}
+
+	if user.OrganizationID != nil {
+		claims["organization_id"] = *user.OrganizationID
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	tokenString, err := token.SignedString(
 		[]byte(s.jwtSecret),

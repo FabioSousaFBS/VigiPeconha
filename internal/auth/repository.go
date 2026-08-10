@@ -49,13 +49,15 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, user users.User) er
 
 func (r *PostgresRepository) FindByEmail(ctx context.Context, email string) (*users.User, error) {
 	query := `
-		SELECT 
+		SELECT
 			id,
 			name,
 			email,
 			phone,
 			password_hash,
 			role,
+			status,
+			organization_id,
 			created_at,
 			updated_at
 		FROM users
@@ -72,6 +74,8 @@ func (r *PostgresRepository) FindByEmail(ctx context.Context, email string) (*us
 		&user.Phone,
 		&user.PasswordHash,
 		&user.Role,
+		&user.Status,
+		&user.OrganizationID,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)

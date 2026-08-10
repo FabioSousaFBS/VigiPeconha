@@ -71,6 +71,15 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 		c.Set(shared.ContextUserEmailKey, email)
 		c.Set(shared.ContextUserRoleKey, role)
 
+		organizationID, _ := claims["organization_id"].(string)
+
+		if organizationID != "" {
+			c.Set(
+				shared.ContextOrganizationIDKey,
+				organizationID,
+			)
+		}
+
 		c.Next()
 	}
 }
