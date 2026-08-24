@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/auth"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/config"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/contracts"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/database"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/middleware"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/organizations"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/users"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -58,5 +62,38 @@ func main() {
 		})
 	})
 
-	router.Run(fmt.Sprintf(":%s", cfg.AppPort))
+	organizationRepository :=
+		organizations.NewPostgresRepository(db)
+
+	contractRepository :=
+		contracts.NewPostgresRepository(db)
+
+	contractService :=
+		contracts.NewService(
+			contractRepository,
+			organizationRepository,
+		)
+
+	protected := router.Group("/protected")
+
+	protected.Use(
+		middleware.Auth(cfg.JWTSecret),
+		middleware.ActiveContract(contractService),
+	)
+
+	protected.GET(
+		"/test",
+		func(c *gin.Context) {
+			c.JSON(
+				http.StatusOK,
+				gin.H{
+					"status": "access_granted",
+				},
+			)
+		},
+	)
+
+	if err := router.Run(":" + cfg.AppPort); err != nil {
+		log.Fatalf("erro ao iniciar servidor: %v", err)
+	}
 }
