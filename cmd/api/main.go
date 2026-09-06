@@ -12,7 +12,6 @@ import (
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/middleware"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/organizations"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/users"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,52 +20,32 @@ func main() {
 
 	cfg := config.Load()
 
-	db := database.Connect(ctx, cfg)
+	db := database.Connect(
+		ctx,
+		cfg,
+	)
+
 	defer db.Close()
 
 	router := gin.Default()
 
-	authRepository := auth.NewPostgresRepository(db)
-
-	authService := auth.NewService(
-		authRepository,
-		cfg.JWTSecret,
-	)
-
-	authHandler := auth.NewHandler(authService)
-
-	auth.RegisterRoutes(router, authHandler)
-
-	usersHandler := users.NewHandler()
-
-	users.RegisterRoutes(
-		router,
-		usersHandler,
-		cfg.JWTSecret,
-	)
-
-	router.GET("/health", func(c *gin.Context) {
-		err := db.Ping(ctx)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"status":   "error",
-				"database": "disconnected",
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"status":   "ok",
-			"database": "connected",
-		})
-	})
+	// -----------------------------------------
+	// Organizations
+	// -----------------------------------------
 
 	organizationRepository :=
-		organizations.NewPostgresRepository(db)
+		organizations.NewPostgresRepository(
+			db,
+		)
+
+	// -----------------------------------------
+	// Contracts
+	// -----------------------------------------
 
 	contractRepository :=
-		contracts.NewPostgresRepository(db)
+		contracts.NewPostgresRepository(
+			db,
+		)
 
 	contractService :=
 		contracts.NewService(
@@ -74,11 +53,106 @@ func main() {
 			organizationRepository,
 		)
 
-	protected := router.Group("/protected")
+	// -----------------------------------------
+	// Authentication
+	// -----------------------------------------
+
+	authRepository :=
+		auth.NewPostgresRepository(
+			db,
+		)
+
+	authService :=
+		auth.NewService(
+			authRepository,
+			cfg.JWTSecret,
+		)
+
+	authHandler :=
+		auth.NewHandler(
+			authService,
+		)
+
+	auth.RegisterRoutes(
+		router,
+		authHandler,
+	)
+
+	// -----------------------------------------
+	// Users
+	// -----------------------------------------
+
+	usersRepository :=
+		users.NewPostgresRepository(
+			db,
+		)
+
+	usersService :=
+		users.NewService(
+			usersRepository,
+		)
+
+	usersHandler :=
+		users.NewHandler(
+			usersService,
+		)
+
+	users.RegisterRoutes(
+		router,
+		usersHandler,
+		cfg.JWTSecret,
+		contractService,
+	)
+
+	// -----------------------------------------
+	// Health
+	// -----------------------------------------
+
+	router.GET(
+		"/health",
+		func(c *gin.Context) {
+			err := db.Ping(
+				c.Request.Context(),
+			)
+
+			if err != nil {
+				c.JSON(
+					http.StatusInternalServerError,
+					gin.H{
+						"status":   "error",
+						"database": "disconnected",
+					},
+				)
+
+				return
+			}
+
+			c.JSON(
+				http.StatusOK,
+				gin.H{
+					"status":   "ok",
+					"database": "connected",
+				},
+			)
+		},
+	)
+
+	// -----------------------------------------
+	// Protected Test
+	// -----------------------------------------
+
+	protected :=
+		router.Group(
+			"/protected",
+		)
 
 	protected.Use(
-		middleware.Auth(cfg.JWTSecret),
-		middleware.ActiveContract(contractService),
+		middleware.Auth(
+			cfg.JWTSecret,
+		),
+		middleware.ActiveContract(
+			contractService,
+		),
 	)
 
 	protected.GET(
@@ -93,7 +167,16 @@ func main() {
 		},
 	)
 
-	if err := router.Run(":" + cfg.AppPort); err != nil {
-		log.Fatalf("erro ao iniciar servidor: %v", err)
+	// -----------------------------------------
+	// Server
+	// -----------------------------------------
+
+	if err := router.Run(
+		":" + cfg.AppPort,
+	); err != nil {
+		log.Fatalf(
+			"erro ao iniciar servidor: %v",
+			err,
+		)
 	}
 }

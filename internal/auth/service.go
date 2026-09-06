@@ -66,7 +66,7 @@ func (s *AuthService) Register(ctx context.Context, input RegisterRequest) (*Reg
 		ID:           uuid.NewString(),
 		Name:         input.Name,
 		Email:        input.Email,
-		Phone:        "",
+		Phone:        nil,
 		PasswordHash: string(passwordHash),
 		Role:         "citizen",
 	}

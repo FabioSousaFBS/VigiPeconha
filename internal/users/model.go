@@ -6,11 +6,17 @@ type User struct {
 	ID             string    `db:"id" json:"id"`
 	Name           string    `db:"name" json:"name"`
 	Email          string    `db:"email" json:"email"`
-	Phone          string    `db:"phone" json:"phone"`
+	Phone          *string   `db:"phone" json:"phone,omitempty"`
 	PasswordHash   string    `db:"password_hash" json:"-"`
 	Role           string    `db:"role" json:"role"`
 	Status         string    `db:"status" json:"status"`
 	OrganizationID *string   `db:"organization_id" json:"organization_id,omitempty"`
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt      time.Time `db:"updated_at" json:"updated_at"`
+}
+
+type LicenseUsage struct {
+	UserLimit   int `json:"user_limit"`
+	ActiveUsers int `json:"active_users"`
+	Available   int `json:"available"`
 }
