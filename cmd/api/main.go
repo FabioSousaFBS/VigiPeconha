@@ -10,6 +10,7 @@ import (
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/contracts"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/database"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/middleware"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/occurrences"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/organizations"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/users"
 	"github.com/gin-gonic/gin"
@@ -102,6 +103,30 @@ func main() {
 		usersHandler,
 		cfg.JWTSecret,
 		contractService,
+	)
+
+	// -----------------------------------------
+	// Occurrences
+	// -----------------------------------------
+
+	occurrencesRepository :=
+		occurrences.NewPostgresRepository(
+			db,
+		)
+
+	occurrencesService :=
+		occurrences.NewService(
+			occurrencesRepository,
+		)
+
+	occurrencesHandler :=
+		occurrences.NewHandler(
+			occurrencesService,
+		)
+
+	occurrences.RegisterRoutes(
+		router,
+		occurrencesHandler,
 	)
 
 	// -----------------------------------------
