@@ -1,10 +1,11 @@
 package occurrences
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
+	"net/http"
 	"strings"
 
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/storage"
@@ -20,8 +21,6 @@ type Service interface {
 	UploadPhoto(
 		ctx context.Context,
 		occurrenceID string,
-		filename string,
-		contentType string,
 		size int64,
 		content io.Reader,
 	) (*OccurrencePhoto, error)
@@ -189,37 +188,23 @@ func normalizeOptionalString(
 func (s *OccurrenceService) UploadPhoto(
 	ctx context.Context,
 	occurrenceID string,
-	filename string,
-	contentType string,
 	size int64,
 	content io.Reader,
 ) (*OccurrencePhoto, error) {
-	const maxFileSize = 5 * 1024 * 1024
+	const maxFileSize int64 = 5 * 1024 * 1024
 
 	if size <= 0 {
-		return nil, fmt.Errorf(
-			"arquivo vazio",
-		)
+		return nil, ErrEmptyPhoto
 	}
 
 	if size > maxFileSize {
-		return nil, fmt.Errorf(
-			"imagem deve possuir no máximo 5 MB",
-		)
+		return nil, ErrPhotoTooLarge
 	}
 
-	if !isAllowedImageType(contentType) {
-		return nil, fmt.Errorf(
-			"formato de imagem não permitido",
-		)
-	}
-
-	exists, err :=
-		s.repository.Exists(
-			ctx,
-			occurrenceID,
-		)
-
+	exists, err := s.repository.Exists(
+		ctx,
+		occurrenceID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -228,10 +213,28 @@ func (s *OccurrenceService) UploadPhoto(
 		return nil, ErrOccurrenceNotFound
 	}
 
-	extension :=
-		strings.ToLower(
-			filepath.Ext(filename),
-		)
+	data, err := io.ReadAll(
+		io.LimitReader(content, maxFileSize+1),
+	)
+	if err != nil {
+		return nil, ErrInvalidPhoto
+	}
+
+	if int64(len(data)) > maxFileSize {
+		return nil, ErrPhotoTooLarge
+	}
+
+	if len(data) == 0 {
+		return nil, ErrEmptyPhoto
+	}
+
+	contentType := http.DetectContentType(data)
+
+	if !isAllowedImageType(contentType) {
+		return nil, ErrInvalidPhotoType
+	}
+
+	extension := extensionForContentType(contentType)
 
 	key := fmt.Sprintf(
 		"occurrences/%s/%s%s",
@@ -243,10 +246,9 @@ func (s *OccurrenceService) UploadPhoto(
 	err = s.storage.Upload(
 		ctx,
 		key,
-		content,
+		bytes.NewReader(data),
 		contentType,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -254,25 +256,17 @@ func (s *OccurrenceService) UploadPhoto(
 	photo := OccurrencePhoto{
 		OccurrenceID: occurrenceID,
 		StorageKey:   key,
-		ContentType:  contentType,
-		FileSize:     size,
 		PhotoURL:     nil,
+		ContentType:  contentType,
+		FileSize:     int64(len(data)),
 	}
 
-	created, err :=
-		s.repository.CreatePhoto(
-			ctx,
-			photo,
-		)
-
+	created, err := s.repository.CreatePhoto(
+		ctx,
+		photo,
+	)
 	if err != nil {
-		// Compensação:
-		// se salvou no R2 mas falhou no banco,
-		// remove o objeto do R2.
-		_ = s.storage.Delete(
-			ctx,
-			key,
-		)
+		_ = s.storage.Delete(ctx, key)
 
 		return nil, err
 	}
@@ -291,5 +285,23 @@ func isAllowedImageType(
 
 	default:
 		return false
+	}
+}
+
+func extensionForContentType(
+	contentType string,
+) string {
+	switch contentType {
+	case "image/jpeg":
+		return ".jpg"
+
+	case "image/png":
+		return ".png"
+
+	case "image/webp":
+		return ".webp"
+
+	default:
+		return ""
 	}
 }

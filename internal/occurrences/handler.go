@@ -55,15 +55,10 @@ func (h *Handler) CreatePublic(
 	)
 }
 
-func (h *Handler) UploadPhoto(
-	c *gin.Context,
-) {
-	occurrenceID :=
-		c.Param("id")
+func (h *Handler) UploadPhoto(c *gin.Context) {
+	occurrenceID := c.Param("id")
 
-	file, err :=
-		c.FormFile("photo")
-
+	file, err := c.FormFile("photo")
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
@@ -71,13 +66,10 @@ func (h *Handler) UploadPhoto(
 				"error": "foto é obrigatória",
 			},
 		)
-
 		return
 	}
 
-	openedFile, err :=
-		file.Open()
-
+	openedFile, err := file.Open()
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
@@ -85,21 +77,17 @@ func (h *Handler) UploadPhoto(
 				"error": "não foi possível ler a foto",
 			},
 		)
-
 		return
 	}
 
 	defer openedFile.Close()
 
-	photo, err :=
-		h.service.UploadPhoto(
-			c.Request.Context(),
-			occurrenceID,
-			file.Filename,
-			file.Header.Get("Content-Type"),
-			file.Size,
-			openedFile,
-		)
+	photo, err := h.service.UploadPhoto(
+		c.Request.Context(),
+		occurrenceID,
+		file.Size,
+		openedFile,
+	)
 
 	if err != nil {
 		handleError(c, err)
@@ -117,46 +105,21 @@ func handleError(
 	err error,
 ) {
 	switch {
-	case errors.Is(
-		err,
-		ErrInvalidOccurrenceType,
-	),
-		errors.Is(
-			err,
-			ErrAnimalTypeRequired,
-		),
-		errors.Is(
-			err,
-			ErrCoordinatesRequired,
-		),
-		errors.Is(
-			err,
-			ErrInvalidLatitude,
-		),
-		errors.Is(
-			err,
-			ErrInvalidLongitude,
-		),
-		errors.Is(
-			err,
-			ErrOccurredAtRequired,
-		),
-		errors.Is(
-			err,
-			ErrInvalidState,
-		):
+	case errors.Is(err, ErrOccurrenceNotFound):
 		c.JSON(
-			http.StatusBadRequest,
+			http.StatusNotFound,
 			gin.H{
 				"error": err.Error(),
 			},
 		)
-	case errors.Is(
-		err,
-		ErrOccurrenceNotFound,
-	):
+
+	case errors.Is(err, ErrEmptyPhoto),
+		errors.Is(err, ErrPhotoTooLarge),
+		errors.Is(err, ErrInvalidPhotoType),
+		errors.Is(err, ErrInvalidPhoto):
+
 		c.JSON(
-			http.StatusNotFound,
+			http.StatusBadRequest,
 			gin.H{
 				"error": err.Error(),
 			},

@@ -34,4 +34,9 @@ var (
 	ErrOccurrenceNotFound = errors.New(
 		"ocorrência não encontrada",
 	)
+
+	ErrEmptyPhoto       = errors.New("arquivo vazio")
+	ErrPhotoTooLarge    = errors.New("imagem deve possuir no máximo 5 MB")
+	ErrInvalidPhotoType = errors.New("formato de imagem não permitido")
+	ErrInvalidPhoto     = errors.New("não foi possível processar a imagem")
 )
