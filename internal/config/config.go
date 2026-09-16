@@ -7,14 +7,18 @@ import (
 )
 
 type Config struct {
-	AppPort   string
-	DBHost    string
-	DBPort    string
-	DBUser    string
-	DBPass    string
-	DBName    string
-	DBSSLMode string
-	JWTSecret string
+	AppPort           string
+	DBHost            string
+	DBPort            string
+	DBUser            string
+	DBPass            string
+	DBName            string
+	DBSSLMode         string
+	JWTSecret         string
+	R2AccountID       string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2BucketName      string
 }
 
 func Load() Config {
@@ -32,6 +36,10 @@ func Load() Config {
 			"JWT_SECRET",
 			"vigipeconha-development-secret",
 		),
+		R2AccountID:       os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2BucketName:      os.Getenv("R2_BUCKET_NAME"),
 	}
 }
 

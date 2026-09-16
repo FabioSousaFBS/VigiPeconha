@@ -2,7 +2,13 @@ package occurrences
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"path/filepath"
 	"strings"
+
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/storage"
+	"github.com/google/uuid"
 )
 
 type Service interface {
@@ -10,17 +16,29 @@ type Service interface {
 		ctx context.Context,
 		request CreatePublicOccurrenceRequest,
 	) (*Occurrence, error)
+
+	UploadPhoto(
+		ctx context.Context,
+		occurrenceID string,
+		filename string,
+		contentType string,
+		size int64,
+		content io.Reader,
+	) (*OccurrencePhoto, error)
 }
 
 type OccurrenceService struct {
 	repository Repository
+	storage    storage.Storage
 }
 
 func NewService(
 	repository Repository,
+	fileStorage storage.Storage,
 ) Service {
 	return &OccurrenceService{
 		repository: repository,
+		storage:    fileStorage,
 	}
 }
 
@@ -166,4 +184,112 @@ func normalizeOptionalString(
 	}
 
 	return &normalized
+}
+
+func (s *OccurrenceService) UploadPhoto(
+	ctx context.Context,
+	occurrenceID string,
+	filename string,
+	contentType string,
+	size int64,
+	content io.Reader,
+) (*OccurrencePhoto, error) {
+	const maxFileSize = 5 * 1024 * 1024
+
+	if size <= 0 {
+		return nil, fmt.Errorf(
+			"arquivo vazio",
+		)
+	}
+
+	if size > maxFileSize {
+		return nil, fmt.Errorf(
+			"imagem deve possuir no máximo 5 MB",
+		)
+	}
+
+	if !isAllowedImageType(contentType) {
+		return nil, fmt.Errorf(
+			"formato de imagem não permitido",
+		)
+	}
+
+	exists, err :=
+		s.repository.Exists(
+			ctx,
+			occurrenceID,
+		)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return nil, ErrOccurrenceNotFound
+	}
+
+	extension :=
+		strings.ToLower(
+			filepath.Ext(filename),
+		)
+
+	key := fmt.Sprintf(
+		"occurrences/%s/%s%s",
+		occurrenceID,
+		uuid.NewString(),
+		extension,
+	)
+
+	err = s.storage.Upload(
+		ctx,
+		key,
+		content,
+		contentType,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	photo := OccurrencePhoto{
+		OccurrenceID: occurrenceID,
+		StorageKey:   key,
+		ContentType:  contentType,
+		FileSize:     size,
+		PhotoURL:     nil,
+	}
+
+	created, err :=
+		s.repository.CreatePhoto(
+			ctx,
+			photo,
+		)
+
+	if err != nil {
+		// Compensação:
+		// se salvou no R2 mas falhou no banco,
+		// remove o objeto do R2.
+		_ = s.storage.Delete(
+			ctx,
+			key,
+		)
+
+		return nil, err
+	}
+
+	return created, nil
+}
+
+func isAllowedImageType(
+	contentType string,
+) bool {
+	switch contentType {
+	case "image/jpeg",
+		"image/png",
+		"image/webp":
+		return true
+
+	default:
+		return false
+	}
 }

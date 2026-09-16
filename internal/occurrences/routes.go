@@ -12,4 +12,9 @@ func RegisterRoutes(
 		"/occurrences",
 		handler.CreatePublic,
 	)
+
+	public.POST(
+		"/occurrences/:id/photos",
+		handler.UploadPhoto,
+	)
 }

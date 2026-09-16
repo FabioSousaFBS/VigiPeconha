@@ -12,6 +12,16 @@ type Repository interface {
 		ctx context.Context,
 		params CreateOccurrenceParams,
 	) (*Occurrence, error)
+
+	CreatePhoto(
+		ctx context.Context,
+		photo OccurrencePhoto,
+	) (*OccurrencePhoto, error)
+
+	Exists(
+		ctx context.Context,
+		occurrenceID string,
+	) (bool, error)
 }
 
 type PostgresRepository struct {
@@ -149,4 +159,91 @@ func (r *PostgresRepository) Create(
 	}
 
 	return &occurrence, nil
+}
+
+func (r *PostgresRepository) Exists(
+	ctx context.Context,
+	occurrenceID string,
+) (bool, error) {
+	var exists bool
+
+	err := r.db.QueryRow(
+		ctx,
+		`
+		SELECT EXISTS (
+			SELECT 1
+			FROM occurrences
+			WHERE id = $1
+		)
+		`,
+		occurrenceID,
+	).Scan(&exists)
+
+	if err != nil {
+		return false, fmt.Errorf(
+			"erro ao verificar ocorrência: %w",
+			err,
+		)
+	}
+
+	return exists, nil
+}
+
+func (r *PostgresRepository) CreatePhoto(
+	ctx context.Context,
+	photo OccurrencePhoto,
+) (*OccurrencePhoto, error) {
+	query := `
+		INSERT INTO occurrence_photos (
+			occurrence_id,
+			storage_key,
+			photo_url,
+			content_type,
+			file_size
+		)
+		VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5
+		)
+		RETURNING
+			id,
+			occurrence_id,
+			storage_key,
+			photo_url,
+			content_type,
+			file_size,
+			created_at
+	`
+
+	var created OccurrencePhoto
+
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		photo.OccurrenceID,
+		photo.StorageKey,
+		photo.PhotoURL,
+		photo.ContentType,
+		photo.FileSize,
+	).Scan(
+		&created.ID,
+		&created.OccurrenceID,
+		&created.StorageKey,
+		&created.PhotoURL,
+		&created.ContentType,
+		&created.FileSize,
+		&created.CreatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"erro ao salvar foto da ocorrência: %w",
+			err,
+		)
+	}
+
+	return &created, nil
 }

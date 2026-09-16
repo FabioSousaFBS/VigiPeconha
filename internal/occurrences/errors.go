@@ -30,4 +30,8 @@ var (
 	ErrInvalidState = errors.New(
 		"estado deve possuir 2 caracteres",
 	)
+
+	ErrOccurrenceNotFound = errors.New(
+		"ocorrência não encontrada",
+	)
 )

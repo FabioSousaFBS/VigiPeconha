@@ -55,6 +55,63 @@ func (h *Handler) CreatePublic(
 	)
 }
 
+func (h *Handler) UploadPhoto(
+	c *gin.Context,
+) {
+	occurrenceID :=
+		c.Param("id")
+
+	file, err :=
+		c.FormFile("photo")
+
+	if err != nil {
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "foto é obrigatória",
+			},
+		)
+
+		return
+	}
+
+	openedFile, err :=
+		file.Open()
+
+	if err != nil {
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": "não foi possível ler a foto",
+			},
+		)
+
+		return
+	}
+
+	defer openedFile.Close()
+
+	photo, err :=
+		h.service.UploadPhoto(
+			c.Request.Context(),
+			occurrenceID,
+			file.Filename,
+			file.Header.Get("Content-Type"),
+			file.Size,
+			openedFile,
+		)
+
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(
+		http.StatusCreated,
+		photo,
+	)
+}
+
 func handleError(
 	c *gin.Context,
 	err error,
@@ -90,6 +147,16 @@ func handleError(
 		):
 		c.JSON(
 			http.StatusBadRequest,
+			gin.H{
+				"error": err.Error(),
+			},
+		)
+	case errors.Is(
+		err,
+		ErrOccurrenceNotFound,
+	):
+		c.JSON(
+			http.StatusNotFound,
 			gin.H{
 				"error": err.Error(),
 			},

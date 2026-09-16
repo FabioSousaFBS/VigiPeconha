@@ -12,6 +12,7 @@ import (
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/middleware"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/occurrences"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/organizations"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/storage"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/users"
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +30,21 @@ func main() {
 	defer db.Close()
 
 	router := gin.Default()
+
+	r2Storage, err := storage.NewR2Storage(
+		context.Background(),
+		cfg.R2AccountID,
+		cfg.R2AccessKeyID,
+		cfg.R2SecretAccessKey,
+		cfg.R2BucketName,
+	)
+
+	if err != nil {
+		log.Fatal(
+			"erro ao inicializar R2: ",
+			err,
+		)
+	}
 
 	// -----------------------------------------
 	// Organizations
@@ -117,6 +133,7 @@ func main() {
 	occurrencesService :=
 		occurrences.NewService(
 			occurrencesRepository,
+			r2Storage,
 		)
 
 	occurrencesHandler :=
