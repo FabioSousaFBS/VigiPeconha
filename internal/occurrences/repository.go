@@ -3,6 +3,7 @@ package occurrences
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,6 +23,11 @@ type Repository interface {
 		ctx context.Context,
 		occurrenceID string,
 	) (bool, error)
+
+	List(
+		ctx context.Context,
+		filter ListOccurrencesFilter,
+	) ([]Occurrence, int64, error)
 }
 
 type PostgresRepository struct {
@@ -246,4 +252,218 @@ func (r *PostgresRepository) CreatePhoto(
 	}
 
 	return &created, nil
+}
+
+func (r *PostgresRepository) List(
+	ctx context.Context,
+	filter ListOccurrencesFilter,
+) ([]Occurrence, int64, error) {
+	whereClause, args := buildListWhereClause(filter)
+
+	countQuery := `
+		SELECT COUNT(*)
+		FROM occurrences
+	` + whereClause
+
+	var total int64
+
+	if err := r.db.QueryRow(
+		ctx,
+		countQuery,
+		args...,
+	).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf(
+			"erro ao contar ocorrências: %w",
+			err,
+		)
+	}
+
+	offset := (filter.Page - 1) * filter.PageSize
+
+	queryArgs := append(
+		[]any{},
+		args...,
+	)
+
+	limitPosition := len(queryArgs) + 1
+	queryArgs = append(queryArgs, filter.PageSize)
+
+	offsetPosition := len(queryArgs) + 1
+	queryArgs = append(queryArgs, offset)
+
+	query := fmt.Sprintf(`
+		SELECT
+			id,
+			organization_id,
+			created_by_user_id,
+			source,
+			occurrence_type,
+			animal_type,
+			species,
+			description,
+			reporter_name,
+			reporter_phone,
+			ST_Y(location::geometry),
+			ST_X(location::geometry),
+			address,
+			neighborhood,
+			city,
+			state,
+			status,
+			occurred_at,
+			created_at,
+			updated_at
+		FROM occurrences
+		%s
+		ORDER BY occurred_at DESC, created_at DESC
+		LIMIT $%d
+		OFFSET $%d
+	`,
+		whereClause,
+		limitPosition,
+		offsetPosition,
+	)
+
+	rows, err := r.db.Query(
+		ctx,
+		query,
+		queryArgs...,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf(
+			"erro ao listar ocorrências: %w",
+			err,
+		)
+	}
+	defer rows.Close()
+
+	occurrences := make([]Occurrence, 0)
+
+	for rows.Next() {
+		var occurrence Occurrence
+
+		err := rows.Scan(
+			&occurrence.ID,
+			&occurrence.OrganizationID,
+			&occurrence.CreatedByUserID,
+			&occurrence.Source,
+			&occurrence.OccurrenceType,
+			&occurrence.AnimalType,
+			&occurrence.Species,
+			&occurrence.Description,
+			&occurrence.ReporterName,
+			&occurrence.ReporterPhone,
+			&occurrence.Latitude,
+			&occurrence.Longitude,
+			&occurrence.Address,
+			&occurrence.Neighborhood,
+			&occurrence.City,
+			&occurrence.State,
+			&occurrence.Status,
+			&occurrence.OccurredAt,
+			&occurrence.CreatedAt,
+			&occurrence.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf(
+				"erro ao ler ocorrência: %w",
+				err,
+			)
+		}
+
+		occurrences = append(
+			occurrences,
+			occurrence,
+		)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf(
+			"erro ao percorrer ocorrências: %w",
+			err,
+		)
+	}
+
+	return occurrences, total, nil
+}
+
+func buildListWhereClause(
+	filter ListOccurrencesFilter,
+) (string, []any) {
+	conditions := make([]string, 0)
+	args := make([]any, 0)
+
+	addCondition := func(
+		column string,
+		value *string,
+		caseInsensitive bool,
+	) {
+		if value == nil {
+			return
+		}
+
+		args = append(args, *value)
+
+		position := len(args)
+
+		if caseInsensitive {
+			conditions = append(
+				conditions,
+				fmt.Sprintf(
+					"LOWER(%s) = LOWER($%d)",
+					column,
+					position,
+				),
+			)
+
+			return
+		}
+
+		conditions = append(
+			conditions,
+			fmt.Sprintf(
+				"%s = $%d",
+				column,
+				position,
+			),
+		)
+	}
+
+	addCondition(
+		"status",
+		filter.Status,
+		false,
+	)
+
+	addCondition(
+		"occurrence_type",
+		filter.OccurrenceType,
+		false,
+	)
+
+	addCondition(
+		"animal_type",
+		filter.AnimalType,
+		true,
+	)
+
+	addCondition(
+		"state",
+		filter.State,
+		true,
+	)
+
+	addCondition(
+		"city",
+		filter.City,
+		true,
+	)
+
+	if len(conditions) == 0 {
+		return "", args
+	}
+
+	return " WHERE " +
+			strings.Join(conditions, " AND "),
+		args
 }

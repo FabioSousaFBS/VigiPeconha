@@ -17,4 +17,10 @@ func RegisterRoutes(
 		"/occurrences/:id/photos",
 		handler.UploadPhoto,
 	)
+
+	router.GET(
+		"/occurrences",
+		handler.List,
+	)
+
 }

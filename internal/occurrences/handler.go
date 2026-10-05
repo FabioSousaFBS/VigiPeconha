@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -116,7 +118,9 @@ func handleError(
 	case errors.Is(err, ErrEmptyPhoto),
 		errors.Is(err, ErrPhotoTooLarge),
 		errors.Is(err, ErrInvalidPhotoType),
-		errors.Is(err, ErrInvalidPhoto):
+		errors.Is(err, ErrInvalidPhoto),
+		errors.Is(err, ErrInvalidOccurrenceType),
+		errors.Is(err, ErrInvalidState):
 
 		c.JSON(
 			http.StatusBadRequest,
@@ -138,4 +142,91 @@ func handleError(
 			},
 		)
 	}
+}
+
+func (h *Handler) List(
+	c *gin.Context,
+) {
+	page := parsePositiveInt(
+		c.Query("page"),
+		1,
+	)
+
+	pageSize := parsePositiveInt(
+		c.Query("page_size"),
+		20,
+	)
+
+	filter := ListOccurrencesFilter{
+		Page:     page,
+		PageSize: pageSize,
+
+		Status: queryStringPointer(
+			c,
+			"status",
+		),
+
+		OccurrenceType: queryStringPointer(
+			c,
+			"occurrence_type",
+		),
+
+		AnimalType: queryStringPointer(
+			c,
+			"animal_type",
+		),
+
+		State: queryStringPointer(
+			c,
+			"state",
+		),
+
+		City: queryStringPointer(
+			c,
+			"city",
+		),
+	}
+
+	response, err := h.service.List(
+		c.Request.Context(),
+		filter,
+	)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(
+		http.StatusOK,
+		response,
+	)
+}
+
+func parsePositiveInt(
+	value string,
+	defaultValue int,
+) int {
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return defaultValue
+	}
+
+	return parsed
+}
+
+func queryStringPointer(
+	c *gin.Context,
+	key string,
+) *string {
+	value := c.Query(key)
+
+	if value == "" {
+		return nil
+	}
+
+	return &value
 }

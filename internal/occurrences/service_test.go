@@ -20,6 +20,12 @@ type mockRepository struct {
 
 	createPhotoCalled bool
 	createPhotoErr    error
+
+	listCalled bool
+	listFilter ListOccurrencesFilter
+	listResult []Occurrence
+	listTotal  int64
+	listErr    error
 }
 
 func (m *mockRepository) Create(
@@ -94,6 +100,20 @@ func (m *mockStorage) Delete(
 	m.deletedKey = key
 
 	return nil
+}
+
+func (m *mockRepository) List(
+	ctx context.Context,
+	filter ListOccurrencesFilter,
+) ([]Occurrence, int64, error) {
+	m.listCalled = true
+	m.listFilter = filter
+
+	if m.listErr != nil {
+		return nil, 0, m.listErr
+	}
+
+	return m.listResult, m.listTotal, nil
 }
 
 func TestCreatePublicSuccess(t *testing.T) {

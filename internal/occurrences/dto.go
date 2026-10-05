@@ -46,3 +46,21 @@ type CreateOccurrenceParams struct {
 	Status     string
 	OccurredAt time.Time
 }
+
+type ListOccurrencesFilter struct {
+	Page           int
+	PageSize       int
+	Status         *string
+	OccurrenceType *string
+	AnimalType     *string
+	State          *string
+	City           *string
+}
+
+type ListOccurrencesResponse struct {
+	Items      []Occurrence `json:"items"`
+	Page       int          `json:"page"`
+	PageSize   int          `json:"page_size"`
+	Total      int64        `json:"total"`
+	TotalPages int          `json:"total_pages"`
+}

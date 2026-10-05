@@ -24,6 +24,11 @@ type Service interface {
 		size int64,
 		content io.Reader,
 	) (*OccurrencePhoto, error)
+
+	List(
+		ctx context.Context,
+		filter ListOccurrencesFilter,
+	) (*ListOccurrencesResponse, error)
 }
 
 type OccurrenceService struct {
@@ -304,4 +309,96 @@ func extensionForContentType(
 	default:
 		return ""
 	}
+}
+
+func (s *OccurrenceService) List(
+	ctx context.Context,
+	filter ListOccurrencesFilter,
+) (*ListOccurrencesResponse, error) {
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+
+	if filter.PageSize <= 0 {
+		filter.PageSize = 20
+	}
+
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+
+	filter.Status = normalizeOptionalString(
+		filter.Status,
+	)
+
+	filter.OccurrenceType = normalizeOptionalString(
+		filter.OccurrenceType,
+	)
+
+	filter.AnimalType = normalizeOptionalString(
+		filter.AnimalType,
+	)
+
+	filter.State = normalizeOptionalString(
+		filter.State,
+	)
+
+	filter.City = normalizeOptionalString(
+		filter.City,
+	)
+
+	if filter.Status != nil {
+		normalized :=
+			strings.ToLower(*filter.Status)
+
+		filter.Status = &normalized
+	}
+
+	if filter.OccurrenceType != nil {
+		normalized :=
+			strings.ToLower(*filter.OccurrenceType)
+
+		if !isValidOccurrenceType(normalized) {
+			return nil, ErrInvalidOccurrenceType
+		}
+
+		filter.OccurrenceType = &normalized
+	}
+
+	if filter.State != nil {
+		normalized :=
+			strings.ToUpper(*filter.State)
+
+		if len(normalized) != 2 {
+			return nil, ErrInvalidState
+		}
+
+		filter.State = &normalized
+	}
+
+	items, total, err := s.repository.List(
+		ctx,
+		filter,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	totalPages := 0
+
+	if total > 0 {
+		totalPages =
+			int(
+				(total + int64(filter.PageSize) - 1) /
+					int64(filter.PageSize),
+			)
+	}
+
+	return &ListOccurrencesResponse{
+		Items:      items,
+		Page:       filter.Page,
+		PageSize:   filter.PageSize,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
 }
