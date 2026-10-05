@@ -144,6 +144,8 @@ func main() {
 	occurrences.RegisterRoutes(
 		router,
 		occurrencesHandler,
+		cfg.JWTSecret,
+		contractService,
 	)
 
 	// -----------------------------------------

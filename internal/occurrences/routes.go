@@ -1,11 +1,21 @@
 package occurrences
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/contracts"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/middleware"
+	"github.com/gin-gonic/gin"
+)
 
 func RegisterRoutes(
 	router *gin.Engine,
 	handler *Handler,
+	jwtSecret string,
+	contractService contracts.Service,
 ) {
+	// -----------------------------------------
+	// Public routes
+	// -----------------------------------------
+
 	public := router.Group("/public")
 
 	public.POST(
@@ -18,9 +28,23 @@ func RegisterRoutes(
 		handler.UploadPhoto,
 	)
 
-	router.GET(
-		"/occurrences",
-		handler.List,
+	// -----------------------------------------
+	// Protected routes
+	// -----------------------------------------
+
+	protected := router.Group("/occurrences")
+
+	protected.Use(
+		middleware.Auth(
+			jwtSecret,
+		),
+		middleware.ActiveContract(
+			contractService,
+		),
 	)
 
+	protected.GET(
+		"",
+		handler.List,
+	)
 }
