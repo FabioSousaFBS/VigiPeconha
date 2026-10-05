@@ -1109,3 +1109,550 @@ func assertStringPointerEquals(
 		)
 	}
 }
+
+func TestListOccurrencesSuccess(t *testing.T) {
+	repository := &mockRepository{
+		listResult: []Occurrence{
+			{
+				ID:             "occurrence-1",
+				Source:         "mobile_public",
+				OccurrenceType: "sighting",
+				AnimalType:     "snake",
+				Status:         "pending",
+			},
+			{
+				ID:             "occurrence-2",
+				Source:         "mobile_public",
+				OccurrenceType: "accident",
+				AnimalType:     "scorpion",
+				Status:         "pending",
+			},
+		},
+		listTotal: 2,
+	}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			Page:     1,
+			PageSize: 20,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	if result == nil {
+		t.Fatal(
+			"esperava resultado, recebeu nil",
+		)
+	}
+
+	if !repository.listCalled {
+		t.Error(
+			"Repository.List deveria ser chamado",
+		)
+	}
+
+	if len(result.Items) != 2 {
+		t.Errorf(
+			"esperava 2 ocorrências, recebeu %d",
+			len(result.Items),
+		)
+	}
+
+	if result.Total != 2 {
+		t.Errorf(
+			"esperava total 2, recebeu %d",
+			result.Total,
+		)
+	}
+
+	if result.Page != 1 {
+		t.Errorf(
+			"esperava page 1, recebeu %d",
+			result.Page,
+		)
+	}
+
+	if result.PageSize != 20 {
+		t.Errorf(
+			"esperava page_size 20, recebeu %d",
+			result.PageSize,
+		)
+	}
+
+	if result.TotalPages != 1 {
+		t.Errorf(
+			"esperava total_pages 1, recebeu %d",
+			result.TotalPages,
+		)
+	}
+}
+
+func TestListOccurrencesDefaultPagination(t *testing.T) {
+	repository := &mockRepository{}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	if repository.listFilter.Page != 1 {
+		t.Errorf(
+			"esperava page 1, recebeu %d",
+			repository.listFilter.Page,
+		)
+	}
+
+	if repository.listFilter.PageSize != 20 {
+		t.Errorf(
+			"esperava page_size 20, recebeu %d",
+			repository.listFilter.PageSize,
+		)
+	}
+
+	if result.Page != 1 {
+		t.Errorf(
+			"esperava response page 1, recebeu %d",
+			result.Page,
+		)
+	}
+
+	if result.PageSize != 20 {
+		t.Errorf(
+			"esperava response page_size 20, recebeu %d",
+			result.PageSize,
+		)
+	}
+}
+
+func TestListOccurrencesLimitsPageSize(t *testing.T) {
+	repository := &mockRepository{}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			Page:     1,
+			PageSize: 1000,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	if repository.listFilter.PageSize != 100 {
+		t.Errorf(
+			"esperava page_size limitado a 100, recebeu %d",
+			repository.listFilter.PageSize,
+		)
+	}
+
+	if result.PageSize != 100 {
+		t.Errorf(
+			"esperava response page_size 100, recebeu %d",
+			result.PageSize,
+		)
+	}
+}
+
+func TestListOccurrencesCalculatesTotalPages(t *testing.T) {
+	repository := &mockRepository{
+		listTotal: 45,
+	}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			Page:     1,
+			PageSize: 20,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	if result.Total != 45 {
+		t.Errorf(
+			"esperava total 45, recebeu %d",
+			result.Total,
+		)
+	}
+
+	if result.TotalPages != 3 {
+		t.Errorf(
+			"esperava total_pages 3, recebeu %d",
+			result.TotalPages,
+		)
+	}
+}
+
+func TestListOccurrencesNormalizesFilters(t *testing.T) {
+	status := "  PENDING  "
+	occurrenceType := "  SIGHTING  "
+	animalType := "  snake  "
+	state := "  sp  "
+	city := "  Garça  "
+
+	repository := &mockRepository{}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	_, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			Page:           1,
+			PageSize:       20,
+			Status:         &status,
+			OccurrenceType: &occurrenceType,
+			AnimalType:     &animalType,
+			State:          &state,
+			City:           &city,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	filter := repository.listFilter
+
+	assertStringPointerEquals(
+		t,
+		filter.Status,
+		"pending",
+		"Status",
+	)
+
+	assertStringPointerEquals(
+		t,
+		filter.OccurrenceType,
+		"sighting",
+		"OccurrenceType",
+	)
+
+	assertStringPointerEquals(
+		t,
+		filter.AnimalType,
+		"snake",
+		"AnimalType",
+	)
+
+	assertStringPointerEquals(
+		t,
+		filter.State,
+		"SP",
+		"State",
+	)
+
+	assertStringPointerEquals(
+		t,
+		filter.City,
+		"Garça",
+		"City",
+	)
+}
+
+func TestListOccurrencesEmptyFiltersBecomeNil(t *testing.T) {
+	empty := "   "
+
+	repository := &mockRepository{}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	_, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			Status:         &empty,
+			OccurrenceType: &empty,
+			AnimalType:     &empty,
+			State:          &empty,
+			City:           &empty,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	filter := repository.listFilter
+
+	if filter.Status != nil {
+		t.Error(
+			"Status deveria ser nil",
+		)
+	}
+
+	if filter.OccurrenceType != nil {
+		t.Error(
+			"OccurrenceType deveria ser nil",
+		)
+	}
+
+	if filter.AnimalType != nil {
+		t.Error(
+			"AnimalType deveria ser nil",
+		)
+	}
+
+	if filter.State != nil {
+		t.Error(
+			"State deveria ser nil",
+		)
+	}
+
+	if filter.City != nil {
+		t.Error(
+			"City deveria ser nil",
+		)
+	}
+}
+
+func TestListOccurrencesInvalidOccurrenceType(
+	t *testing.T,
+) {
+	occurrenceType := "invalid"
+
+	repository := &mockRepository{}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			OccurrenceType: &occurrenceType,
+		},
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidOccurrenceType,
+	) {
+		t.Errorf(
+			"esperava ErrInvalidOccurrenceType, recebeu %v",
+			err,
+		)
+	}
+
+	if result != nil {
+		t.Error(
+			"resultado deveria ser nil",
+		)
+	}
+
+	if repository.listCalled {
+		t.Error(
+			"Repository.List não deveria ser chamado",
+		)
+	}
+}
+
+func TestListOccurrencesInvalidState(t *testing.T) {
+	state := "SPP"
+
+	repository := &mockRepository{}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			State: &state,
+		},
+	)
+
+	if !errors.Is(
+		err,
+		ErrInvalidState,
+	) {
+		t.Errorf(
+			"esperava ErrInvalidState, recebeu %v",
+			err,
+		)
+	}
+
+	if result != nil {
+		t.Error(
+			"resultado deveria ser nil",
+		)
+	}
+
+	if repository.listCalled {
+		t.Error(
+			"Repository.List não deveria ser chamado",
+		)
+	}
+}
+
+func TestListOccurrencesEmptyResult(t *testing.T) {
+	repository := &mockRepository{
+		listResult: []Occurrence{},
+		listTotal:  0,
+	}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{
+			Page:     1,
+			PageSize: 20,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"não esperava erro, recebeu %v",
+			err,
+		)
+	}
+
+	if result == nil {
+		t.Fatal(
+			"esperava resultado, recebeu nil",
+		)
+	}
+
+	if len(result.Items) != 0 {
+		t.Errorf(
+			"esperava 0 ocorrências, recebeu %d",
+			len(result.Items),
+		)
+	}
+
+	if result.Total != 0 {
+		t.Errorf(
+			"esperava total 0, recebeu %d",
+			result.Total,
+		)
+	}
+
+	if result.TotalPages != 0 {
+		t.Errorf(
+			"esperava total_pages 0, recebeu %d",
+			result.TotalPages,
+		)
+	}
+}
+
+func TestListOccurrencesRepositoryError(t *testing.T) {
+	expectedError := errors.New(
+		"erro simulado ao listar ocorrências",
+	)
+
+	repository := &mockRepository{
+		listErr: expectedError,
+	}
+
+	storage := &mockStorage{}
+
+	service := NewService(
+		repository,
+		storage,
+	)
+
+	result, err := service.List(
+		context.Background(),
+		ListOccurrencesFilter{},
+	)
+
+	if !errors.Is(
+		err,
+		expectedError,
+	) {
+		t.Errorf(
+			"esperava erro do repository, recebeu %v",
+			err,
+		)
+	}
+
+	if result != nil {
+		t.Error(
+			"resultado deveria ser nil quando Repository.List falha",
+		)
+	}
+
+	if !repository.listCalled {
+		t.Error(
+			"Repository.List deveria ser chamado",
+		)
+	}
+}
