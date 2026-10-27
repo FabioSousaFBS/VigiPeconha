@@ -115,7 +115,8 @@ func handleError(
 			},
 		)
 
-	case errors.Is(err, ErrEmptyPhoto),
+	case errors.Is(err, ErrInvalidOccurrenceID),
+		errors.Is(err, ErrEmptyPhoto),
 		errors.Is(err, ErrPhotoTooLarge),
 		errors.Is(err, ErrInvalidPhotoType),
 		errors.Is(err, ErrInvalidPhoto),
@@ -128,14 +129,6 @@ func handleError(
 				"error": err.Error(),
 			},
 		)
-
-	case errors.Is(err, ErrInvalidOccurrenceID),
-		errors.Is(err, ErrEmptyPhoto),
-		errors.Is(err, ErrPhotoTooLarge),
-		errors.Is(err, ErrInvalidPhotoType),
-		errors.Is(err, ErrInvalidPhoto),
-		errors.Is(err, ErrInvalidOccurrenceType),
-		errors.Is(err, ErrInvalidState):
 
 	default:
 		log.Printf(
