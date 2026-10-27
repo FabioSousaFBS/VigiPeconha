@@ -47,4 +47,9 @@ func RegisterRoutes(
 		"",
 		handler.List,
 	)
+
+	protected.GET(
+		"/:id",
+		handler.GetByID,
+	)
 }

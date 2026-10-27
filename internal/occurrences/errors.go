@@ -39,4 +39,8 @@ var (
 	ErrPhotoTooLarge    = errors.New("imagem deve possuir no máximo 5 MB")
 	ErrInvalidPhotoType = errors.New("formato de imagem não permitido")
 	ErrInvalidPhoto     = errors.New("não foi possível processar a imagem")
+
+	ErrInvalidOccurrenceID = errors.New(
+		"identificador da ocorrência inválido",
+	)
 )

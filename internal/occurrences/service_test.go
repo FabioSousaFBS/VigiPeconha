@@ -26,6 +26,14 @@ type mockRepository struct {
 	listResult []Occurrence
 	listTotal  int64
 	listErr    error
+
+	findByIDCalled bool
+	findByIDResult *Occurrence
+	findByIDErr    error
+
+	listPhotosCalled bool
+	listPhotosResult []OccurrencePhoto
+	listPhotosErr    error
 }
 
 func (m *mockRepository) Create(
@@ -1655,4 +1663,30 @@ func TestListOccurrencesRepositoryError(t *testing.T) {
 			"Repository.List deveria ser chamado",
 		)
 	}
+}
+
+func (m *mockRepository) FindByID(
+	ctx context.Context,
+	occurrenceID string,
+) (*Occurrence, error) {
+	m.findByIDCalled = true
+
+	if m.findByIDErr != nil {
+		return nil, m.findByIDErr
+	}
+
+	return m.findByIDResult, nil
+}
+
+func (m *mockRepository) ListPhotos(
+	ctx context.Context,
+	occurrenceID string,
+) ([]OccurrencePhoto, error) {
+	m.listPhotosCalled = true
+
+	if m.listPhotosErr != nil {
+		return nil, m.listPhotosErr
+	}
+
+	return m.listPhotosResult, nil
 }

@@ -2,9 +2,11 @@ package occurrences
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -28,6 +30,16 @@ type Repository interface {
 		ctx context.Context,
 		filter ListOccurrencesFilter,
 	) ([]Occurrence, int64, error)
+
+	FindByID(
+		ctx context.Context,
+		occurrenceID string,
+	) (*Occurrence, error)
+
+	ListPhotos(
+		ctx context.Context,
+		occurrenceID string,
+	) ([]OccurrencePhoto, error)
 }
 
 type PostgresRepository struct {
@@ -466,4 +478,142 @@ func buildListWhereClause(
 	return " WHERE " +
 			strings.Join(conditions, " AND "),
 		args
+}
+
+func (r *PostgresRepository) FindByID(
+	ctx context.Context,
+	occurrenceID string,
+) (*Occurrence, error) {
+	const query = `
+		SELECT
+			id,
+			organization_id,
+			created_by_user_id,
+			source,
+			occurrence_type,
+			animal_type,
+			species,
+			description,
+			reporter_name,
+			reporter_phone,
+			ST_Y(location::geometry),
+			ST_X(location::geometry),
+			address,
+			neighborhood,
+			city,
+			state,
+			status,
+			occurred_at,
+			created_at,
+			updated_at
+		FROM occurrences
+		WHERE id = $1
+	`
+
+	var occurrence Occurrence
+
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		occurrenceID,
+	).Scan(
+		&occurrence.ID,
+		&occurrence.OrganizationID,
+		&occurrence.CreatedByUserID,
+		&occurrence.Source,
+		&occurrence.OccurrenceType,
+		&occurrence.AnimalType,
+		&occurrence.Species,
+		&occurrence.Description,
+		&occurrence.ReporterName,
+		&occurrence.ReporterPhone,
+		&occurrence.Latitude,
+		&occurrence.Longitude,
+		&occurrence.Address,
+		&occurrence.Neighborhood,
+		&occurrence.City,
+		&occurrence.State,
+		&occurrence.Status,
+		&occurrence.OccurredAt,
+		&occurrence.CreatedAt,
+		&occurrence.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOccurrenceNotFound
+		}
+
+		return nil, fmt.Errorf(
+			"erro ao consultar ocorrência: %w",
+			err,
+		)
+	}
+
+	return &occurrence, nil
+}
+
+func (r *PostgresRepository) ListPhotos(
+	ctx context.Context,
+	occurrenceID string,
+) ([]OccurrencePhoto, error) {
+	const query = `
+		SELECT
+			id,
+			occurrence_id,
+			storage_key,
+			photo_url,
+			content_type,
+			file_size,
+			created_at
+		FROM occurrence_photos
+		WHERE occurrence_id = $1
+		ORDER BY created_at ASC, id ASC
+	`
+
+	rows, err := r.db.Query(
+		ctx,
+		query,
+		occurrenceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"erro ao consultar fotos: %w",
+			err,
+		)
+	}
+	defer rows.Close()
+
+	photos := make([]OccurrencePhoto, 0)
+
+	for rows.Next() {
+		var photo OccurrencePhoto
+
+		err := rows.Scan(
+			&photo.ID,
+			&photo.OccurrenceID,
+			&photo.StorageKey,
+			&photo.PhotoURL,
+			&photo.ContentType,
+			&photo.FileSize,
+			&photo.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"erro ao ler foto: %w",
+				err,
+			)
+		}
+
+		photos = append(photos, photo)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"erro ao percorrer fotos: %w",
+			err,
+		)
+	}
+
+	return photos, nil
 }

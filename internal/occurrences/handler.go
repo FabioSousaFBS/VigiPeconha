@@ -129,6 +129,14 @@ func handleError(
 			},
 		)
 
+	case errors.Is(err, ErrInvalidOccurrenceID),
+		errors.Is(err, ErrEmptyPhoto),
+		errors.Is(err, ErrPhotoTooLarge),
+		errors.Is(err, ErrInvalidPhotoType),
+		errors.Is(err, ErrInvalidPhoto),
+		errors.Is(err, ErrInvalidOccurrenceType),
+		errors.Is(err, ErrInvalidState):
+
 	default:
 		log.Printf(
 			"[occurrences] erro interno: %v",
@@ -229,4 +237,24 @@ func queryStringPointer(
 	}
 
 	return &value
+}
+
+func (h *Handler) GetByID(
+	c *gin.Context,
+) {
+	occurrenceID := c.Param("id")
+
+	response, err := h.service.GetByID(
+		c.Request.Context(),
+		occurrenceID,
+	)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(
+		http.StatusOK,
+		response,
+	)
 }

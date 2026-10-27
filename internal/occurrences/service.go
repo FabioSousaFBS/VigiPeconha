@@ -29,6 +29,11 @@ type Service interface {
 		ctx context.Context,
 		filter ListOccurrencesFilter,
 	) (*ListOccurrencesResponse, error)
+
+	GetByID(
+		ctx context.Context,
+		occurrenceID string,
+	) (*OccurrenceDetailsResponse, error)
 }
 
 type OccurrenceService struct {
@@ -400,5 +405,37 @@ func (s *OccurrenceService) List(
 		PageSize:   filter.PageSize,
 		Total:      total,
 		TotalPages: totalPages,
+	}, nil
+}
+
+func (s *OccurrenceService) GetByID(
+	ctx context.Context,
+	occurrenceID string,
+) (*OccurrenceDetailsResponse, error) {
+	occurrenceID = strings.TrimSpace(occurrenceID)
+
+	if _, err := uuid.Parse(occurrenceID); err != nil {
+		return nil, ErrInvalidOccurrenceID
+	}
+
+	occurrence, err := s.repository.FindByID(
+		ctx,
+		occurrenceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	photos, err := s.repository.ListPhotos(
+		ctx,
+		occurrenceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OccurrenceDetailsResponse{
+		Occurrence: *occurrence,
+		Photos:     photos,
 	}, nil
 }
