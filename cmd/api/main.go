@@ -9,6 +9,7 @@ import (
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/config"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/contracts"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/database"
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/healthfacilities"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/middleware"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/occurrences"
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/organizations"
@@ -223,4 +224,28 @@ func main() {
 			err,
 		)
 	}
+
+	// -----------------------------------------
+	// Health Facilities
+	// -----------------------------------------
+
+	healthFacilitiesRepository :=
+		healthfacilities.NewPostgresRepository(db)
+
+	healthFacilitiesService :=
+		healthfacilities.NewService(
+			healthFacilitiesRepository,
+		)
+
+	healthFacilitiesHandler :=
+		healthfacilities.NewHandler(
+			healthFacilitiesService,
+		)
+
+	healthfacilities.RegisterRoutes(
+		router,
+		healthFacilitiesHandler,
+		cfg.JWTSecret,
+		contractService,
+	)
 }
