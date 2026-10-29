@@ -150,6 +150,30 @@ func main() {
 	)
 
 	// -----------------------------------------
+	// Health Facilities
+	// -----------------------------------------
+
+	healthFacilitiesRepository :=
+		healthfacilities.NewPostgresRepository(db)
+
+	healthFacilitiesService :=
+		healthfacilities.NewService(
+			healthFacilitiesRepository,
+		)
+
+	healthFacilitiesHandler :=
+		healthfacilities.NewHandler(
+			healthFacilitiesService,
+		)
+
+	healthfacilities.RegisterRoutes(
+		router,
+		healthFacilitiesHandler,
+		cfg.JWTSecret,
+		contractService,
+	)
+
+	// -----------------------------------------
 	// Health
 	// -----------------------------------------
 
@@ -225,27 +249,4 @@ func main() {
 		)
 	}
 
-	// -----------------------------------------
-	// Health Facilities
-	// -----------------------------------------
-
-	healthFacilitiesRepository :=
-		healthfacilities.NewPostgresRepository(db)
-
-	healthFacilitiesService :=
-		healthfacilities.NewService(
-			healthFacilitiesRepository,
-		)
-
-	healthFacilitiesHandler :=
-		healthfacilities.NewHandler(
-			healthFacilitiesService,
-		)
-
-	healthfacilities.RegisterRoutes(
-		router,
-		healthFacilitiesHandler,
-		cfg.JWTSecret,
-		contractService,
-	)
 }
