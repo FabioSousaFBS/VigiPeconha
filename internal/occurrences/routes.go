@@ -52,4 +52,13 @@ func RegisterRoutes(
 		"/:id",
 		handler.GetByID,
 	)
+
+	protected.PATCH(
+		"/:id/status",
+		middleware.RequireRole(
+			"organization_admin",
+			"system_admin",
+		),
+		handler.UpdateStatus,
+	)
 }

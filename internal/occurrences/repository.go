@@ -40,6 +40,13 @@ type Repository interface {
 		ctx context.Context,
 		occurrenceID string,
 	) ([]OccurrencePhoto, error)
+
+	UpdateStatus(
+		ctx context.Context,
+		occurrenceID string,
+		status string,
+		userID string,
+	) (*Occurrence, error)
 }
 
 type PostgresRepository struct {
@@ -616,4 +623,145 @@ func (r *PostgresRepository) ListPhotos(
 	}
 
 	return photos, nil
+}
+
+func (r *PostgresRepository) UpdateStatus(
+	ctx context.Context,
+	occurrenceID string,
+	status string,
+	userID string,
+) (*Occurrence, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"erro ao iniciar transação: %w", err,
+		)
+	}
+	defer tx.Rollback(ctx)
+
+	var previousStatus string
+
+	err = tx.QueryRow(
+		ctx,
+		`
+		SELECT status
+		FROM occurrences
+		WHERE id = $1
+		FOR UPDATE
+		`,
+		occurrenceID,
+	).Scan(&previousStatus)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrOccurrenceNotFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"erro ao consultar status: %w", err,
+		)
+	}
+
+	if previousStatus == status {
+		return nil, ErrOccurrenceStatusUnchanged
+	}
+
+	const query = `
+		UPDATE occurrences
+		SET
+			status = $2,
+			status_updated_by_user_id = $3,
+			status_updated_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING
+			id,
+			organization_id,
+			created_by_user_id,
+			source,
+			occurrence_type,
+			animal_type,
+			species,
+			description,
+			reporter_name,
+			reporter_phone,
+			ST_Y(location::geometry),
+			ST_X(location::geometry),
+			address,
+			neighborhood,
+			city,
+			state,
+			status,
+			occurred_at,
+			created_at,
+			updated_at
+	`
+
+	var occurrence Occurrence
+
+	err = tx.QueryRow(
+		ctx,
+		query,
+		occurrenceID,
+		status,
+		userID,
+	).Scan(
+		&occurrence.ID,
+		&occurrence.OrganizationID,
+		&occurrence.CreatedByUserID,
+		&occurrence.Source,
+		&occurrence.OccurrenceType,
+		&occurrence.AnimalType,
+		&occurrence.Species,
+		&occurrence.Description,
+		&occurrence.ReporterName,
+		&occurrence.ReporterPhone,
+		&occurrence.Latitude,
+		&occurrence.Longitude,
+		&occurrence.Address,
+		&occurrence.Neighborhood,
+		&occurrence.City,
+		&occurrence.State,
+		&occurrence.Status,
+		&occurrence.OccurredAt,
+		&occurrence.CreatedAt,
+		&occurrence.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"erro ao atualizar ocorrência: %w", err,
+		)
+	}
+
+	_, err = tx.Exec(
+		ctx,
+		`
+		INSERT INTO occurrence_status_history (
+			occurrence_id,
+			changed_by_user_id,
+			previous_status,
+			new_status
+		)
+		VALUES ($1, $2, $3, $4)
+		`,
+		occurrenceID,
+		userID,
+		previousStatus,
+		status,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"erro ao registrar histórico: %w", err,
+		)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf(
+			"erro ao confirmar transação: %w", err,
+		)
+	}
+
+	return &occurrence, nil
 }

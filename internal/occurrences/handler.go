@@ -7,6 +7,7 @@ import (
 
 	"strconv"
 
+	"github.com/FabioSousaFBS/vigipeconha-api/internal/shared"
 	"github.com/gin-gonic/gin"
 )
 
@@ -121,6 +122,7 @@ func handleError(
 		errors.Is(err, ErrInvalidPhotoType),
 		errors.Is(err, ErrInvalidPhoto),
 		errors.Is(err, ErrInvalidOccurrenceType),
+		errors.Is(err, ErrInvalidOccurrenceStatus),
 		errors.Is(err, ErrInvalidState):
 
 		c.JSON(
@@ -128,6 +130,12 @@ func handleError(
 			gin.H{
 				"error": err.Error(),
 			},
+		)
+
+	case errors.Is(err, ErrOccurrenceStatusUnchanged):
+		c.JSON(
+			http.StatusConflict,
+			gin.H{"error": err.Error()},
 		)
 
 	default:
@@ -250,4 +258,40 @@ func (h *Handler) GetByID(
 		http.StatusOK,
 		response,
 	)
+}
+
+func (h *Handler) UpdateStatus(c *gin.Context) {
+	var request UpdateOccurrenceStatusRequest
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{"error": "dados da atualização inválidos"},
+		)
+		return
+	}
+
+	userID := c.GetString(shared.ContextUserIDKey)
+
+	if userID == "" {
+		c.JSON(
+			http.StatusUnauthorized,
+			gin.H{"error": "usuário não autenticado"},
+		)
+		return
+	}
+
+	occurrence, err := h.service.UpdateStatus(
+		c.Request.Context(),
+		c.Param("id"),
+		request.Status,
+		userID,
+	)
+
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, occurrence)
 }

@@ -43,4 +43,12 @@ var (
 	ErrInvalidOccurrenceID = errors.New(
 		"identificador da ocorrência inválido",
 	)
+
+	ErrInvalidOccurrenceStatus = errors.New(
+		"status da ocorrência inválido",
+	)
+
+	ErrOccurrenceStatusUnchanged = errors.New(
+		"ocorrência já possui o status informado",
+	)
 )

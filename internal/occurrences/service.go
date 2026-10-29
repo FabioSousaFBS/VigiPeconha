@@ -35,6 +35,13 @@ type Service interface {
 		ctx context.Context,
 		occurrenceID string,
 	) (*OccurrenceDetailsResponse, error)
+
+	UpdateStatus(
+		ctx context.Context,
+		occurrenceID string,
+		status string,
+		userID string,
+	) (*Occurrence, error)
 }
 
 type OccurrenceService struct {
@@ -459,4 +466,34 @@ func (s *OccurrenceService) GetByID(
 		Occurrence: *occurrence,
 		Photos:     photos,
 	}, nil
+}
+
+func (s *OccurrenceService) UpdateStatus(
+	ctx context.Context,
+	occurrenceID string,
+	status string,
+	userID string,
+) (*Occurrence, error) {
+	occurrenceID = strings.TrimSpace(occurrenceID)
+	status = strings.ToLower(strings.TrimSpace(status))
+	userID = strings.TrimSpace(userID)
+
+	if _, err := uuid.Parse(occurrenceID); err != nil {
+		return nil, ErrInvalidOccurrenceID
+	}
+
+	if !isValidOccurrenceStatus(status) {
+		return nil, ErrInvalidOccurrenceStatus
+	}
+
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, fmt.Errorf("usuário autenticado inválido")
+	}
+
+	return s.repository.UpdateStatus(
+		ctx,
+		occurrenceID,
+		status,
+		userID,
+	)
 }

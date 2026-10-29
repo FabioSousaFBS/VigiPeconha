@@ -34,6 +34,13 @@ type mockRepository struct {
 	listPhotosCalled bool
 	listPhotosResult []OccurrencePhoto
 	listPhotosErr    error
+
+	updateStatusCalled bool
+	updateStatusID     string
+	updateStatusValue  string
+	updateStatusUserID string
+	updateStatusResult *Occurrence
+	updateStatusErr    error
 }
 
 func (m *mockRepository) Create(
@@ -1715,4 +1722,29 @@ func (m *mockStorage) PresignGetURL(
 	}
 
 	return "https://example.com/signed-photo", nil
+}
+
+func (m *mockRepository) UpdateStatus(
+	ctx context.Context,
+	occurrenceID string,
+	status string,
+	userID string,
+) (*Occurrence, error) {
+	m.updateStatusCalled = true
+	m.updateStatusID = occurrenceID
+	m.updateStatusValue = status
+	m.updateStatusUserID = userID
+
+	if m.updateStatusErr != nil {
+		return nil, m.updateStatusErr
+	}
+
+	if m.updateStatusResult != nil {
+		return m.updateStatusResult, nil
+	}
+
+	return &Occurrence{
+		ID:     occurrenceID,
+		Status: status,
+	}, nil
 }
