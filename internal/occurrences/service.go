@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/FabioSousaFBS/vigipeconha-api/internal/storage"
 	"github.com/google/uuid"
@@ -432,6 +433,26 @@ func (s *OccurrenceService) GetByID(
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	const photoURLExpiration = 15 * time.Minute
+
+	for i := range photos {
+		url, err := s.storage.PresignGetURL(
+			ctx,
+			photos[i].StorageKey,
+			photoURLExpiration,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf(
+				"erro ao gerar URL da foto %s: %w",
+				photos[i].ID,
+				err,
+			)
+		}
+
+		photos[i].PhotoURL = &url
 	}
 
 	return &OccurrenceDetailsResponse{

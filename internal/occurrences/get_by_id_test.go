@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 const testOccurrenceID = "550e8400-e29b-41d4-a716-446655440000"
@@ -199,5 +200,93 @@ func TestGetByIDListPhotosRepositoryError(t *testing.T) {
 
 	if !repository.findByIDCalled || !repository.listPhotosCalled {
 		t.Fatal("ambos os métodos deveriam ser chamados")
+	}
+}
+
+func TestGetByIDGeneratesSignedPhotoURL(t *testing.T) {
+	repository := &mockRepository{
+		findByIDResult: &Occurrence{
+			ID: testOccurrenceID,
+		},
+		listPhotosResult: []OccurrencePhoto{
+			{
+				ID:           "photo-1",
+				OccurrenceID: testOccurrenceID,
+				StorageKey:   "occurrences/photo-1.jpg",
+			},
+		},
+	}
+
+	storage := &mockStorage{
+		presignURL: "https://example.com/signed-photo",
+	}
+
+	service := NewService(repository, storage)
+
+	result, err := service.GetByID(
+		context.Background(),
+		testOccurrenceID,
+	)
+
+	if err != nil {
+		t.Fatalf("não esperava erro: %v", err)
+	}
+
+	if !storage.presignCalled {
+		t.Fatal("PresignGetURL deveria ser chamado")
+	}
+
+	if storage.presignKey != "occurrences/photo-1.jpg" {
+		t.Errorf("storage key incorreta: %s", storage.presignKey)
+	}
+
+	if storage.presignExpiration != 15*time.Minute {
+		t.Errorf(
+			"expiração incorreta: %v",
+			storage.presignExpiration,
+		)
+	}
+
+	if result.Photos[0].PhotoURL == nil {
+		t.Fatal("PhotoURL não deveria ser nil")
+	}
+
+	if *result.Photos[0].PhotoURL != storage.presignURL {
+		t.Errorf("URL assinada incorreta")
+	}
+}
+
+func TestGetByIDPresignError(t *testing.T) {
+	expectedError := errors.New("erro simulado no R2")
+
+	repository := &mockRepository{
+		findByIDResult: &Occurrence{
+			ID: testOccurrenceID,
+		},
+		listPhotosResult: []OccurrencePhoto{
+			{
+				ID:         "photo-1",
+				StorageKey: "occurrences/photo-1.jpg",
+			},
+		},
+	}
+
+	storage := &mockStorage{
+		presignErr: expectedError,
+	}
+
+	service := NewService(repository, storage)
+
+	result, err := service.GetByID(
+		context.Background(),
+		testOccurrenceID,
+	)
+
+	if !errors.Is(err, expectedError) {
+		t.Fatalf("esperava erro do R2, recebeu %v", err)
+	}
+
+	if result != nil {
+		t.Fatal("resultado deveria ser nil")
 	}
 }

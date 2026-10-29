@@ -86,6 +86,12 @@ type mockStorage struct {
 	deletedKey  string
 
 	uploadErr error
+
+	presignCalled     bool
+	presignKey        string
+	presignExpiration time.Duration
+	presignURL        string
+	presignErr        error
 }
 
 func (m *mockStorage) Upload(
@@ -1689,4 +1695,24 @@ func (m *mockRepository) ListPhotos(
 	}
 
 	return m.listPhotosResult, nil
+}
+
+func (m *mockStorage) PresignGetURL(
+	ctx context.Context,
+	key string,
+	expires time.Duration,
+) (string, error) {
+	m.presignCalled = true
+	m.presignKey = key
+	m.presignExpiration = expires
+
+	if m.presignErr != nil {
+		return "", m.presignErr
+	}
+
+	if m.presignURL != "" {
+		return m.presignURL, nil
+	}
+
+	return "https://example.com/signed-photo", nil
 }

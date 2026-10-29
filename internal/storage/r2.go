@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -23,6 +24,12 @@ type Storage interface {
 		ctx context.Context,
 		key string,
 	) error
+
+	PresignGetURL(
+		ctx context.Context,
+		key string,
+		expires time.Duration,
+	) (string, error)
 }
 
 type R2Storage struct {
@@ -121,4 +128,40 @@ func (s *R2Storage) Delete(
 	}
 
 	return nil
+}
+
+func (s *R2Storage) PresignGetURL(
+	ctx context.Context,
+	key string,
+	expires time.Duration,
+) (string, error) {
+	if key == "" {
+		return "", fmt.Errorf("storage key não pode ser vazia")
+	}
+
+	if expires <= 0 || expires > 7*24*time.Hour {
+		return "", fmt.Errorf("prazo de expiração inválido")
+	}
+
+	presignClient := s3.NewPresignClient(s.client)
+
+	result, err := presignClient.PresignGetObject(
+		ctx,
+		&s3.GetObjectInput{
+			Bucket: aws.String(s.bucket),
+			Key:    aws.String(key),
+		},
+		func(options *s3.PresignOptions) {
+			options.Expires = expires
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf(
+			"erro ao gerar URL temporária do R2: %w",
+			err,
+		)
+	}
+
+	return result.URL, nil
 }
