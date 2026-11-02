@@ -100,26 +100,126 @@ func RegisterMapRoutes(router *gin.Engine, db *pgxpool.Pool) {
 	})
 }
 
-func queryOccurrenceMap(ctx context.Context, db *pgxpool.Pool, b MapBounds, status, animal string, from, to *time.Time, limit int) ([]MapPoint, error) {
-	const query = `SELECT id,ST_Y(location::geometry),ST_X(location::geometry),animal_type,occurrence_type,status,occurred_at
- FROM occurrences WHERE location::geometry && ST_MakeEnvelope($1,$2,$3,$4,4326)
- AND ($5='all' OR ($5='active' AND status<>'archived') OR status=$5)
- AND ($6='' OR LOWER(animal_type)=LOWER($6))
- AND ($7::timestamptz IS NULL OR occurred_at >= $7)
- AND ($8::timestamptz IS NULL OR occurred_at <= $8)
- ORDER BY occurred_at DESC,id LIMIT $9`
-	rows, err := db.Query(ctx, query, b.MinLon, b.MinLat, b.MaxLon, b.MaxLat, status, animal, from, to, limit)
+func queryOccurrenceMap(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	b MapBounds,
+	status, animal string,
+	from, to *time.Time,
+	limit int,
+) ([]MapPoint, error) {
+	const query = `
+		SELECT
+			id,
+
+			-- Aproximação pública em grade de ~1 km.
+			-- ST_Transform para metros, SnapToGrid e retorno em WGS84.
+			ST_Y(
+				ST_Transform(
+					ST_SnapToGrid(
+						ST_Transform(location::geometry, 3857),
+						1000
+					),
+					4326
+				)
+			) AS latitude,
+
+			ST_X(
+				ST_Transform(
+					ST_SnapToGrid(
+						ST_Transform(location::geometry, 3857),
+						1000
+					),
+					4326
+				)
+			) AS longitude,
+
+			animal_type,
+			occurrence_type,
+			status,
+			occurred_at
+
+		FROM occurrences
+		WHERE
+			location::geometry &&
+				ST_MakeEnvelope($1, $2, $3, $4, 4326)
+
+			-- Regra permanente do mapa público.
+			AND status <> 'archived'
+
+			-- 'all' e 'active' incluem somente não arquivadas.
+			AND (
+				$5 IN ('all', 'active')
+				OR status = $5
+			)
+
+			AND (
+				$6 = ''
+				OR LOWER(animal_type) = LOWER($6)
+			)
+
+			AND (
+				$7::timestamptz IS NULL
+				OR occurred_at >= $7
+			)
+
+			AND (
+				$8::timestamptz IS NULL
+				OR occurred_at <= $8
+			)
+
+		ORDER BY occurred_at DESC, id
+		LIMIT $9
+	`
+
+	rows, err := db.Query(
+		ctx,
+		query,
+		b.MinLon,
+		b.MinLat,
+		b.MaxLon,
+		b.MaxLat,
+		status,
+		animal,
+		from,
+		to,
+		limit,
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(
+			"erro ao consultar ocorrências do mapa: %w",
+			err,
+		)
 	}
 	defer rows.Close()
-	result := make([]MapPoint, 0)
+
+	items := make([]MapPoint, 0)
+
 	for rows.Next() {
-		var p MapPoint
-		if err := rows.Scan(&p.ID, &p.Latitude, &p.Longitude, &p.AnimalType, &p.OccurrenceType, &p.Status, &p.OccurredAt); err != nil {
-			return nil, err
+		var point MapPoint
+
+		err := rows.Scan(
+			&point.ID,
+			&point.Latitude,
+			&point.Longitude,
+			&point.AnimalType,
+			&point.OccurrenceType,
+			&point.Status,
+			&point.OccurredAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"erro ao ler ocorrência do mapa: %w",
+				err,
+			)
 		}
-		result = append(result, p)
+
+		items = append(items, point)
 	}
-	return result, rows.Err()
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }
