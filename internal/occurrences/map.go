@@ -108,66 +108,35 @@ func queryOccurrenceMap(
 	from, to *time.Time,
 	limit int,
 ) ([]MapPoint, error) {
+
 	const query = `
 		SELECT
 			id,
-
-			-- Aproximação pública em grade de ~1 km.
-			-- ST_Transform para metros, SnapToGrid e retorno em WGS84.
-			ST_Y(
-				ST_Transform(
-					ST_SnapToGrid(
-						ST_Transform(location::geometry, 3857),
-						1000
-					),
-					4326
-				)
-			) AS latitude,
-
-			ST_X(
-				ST_Transform(
-					ST_SnapToGrid(
-						ST_Transform(location::geometry, 3857),
-						1000
-					),
-					4326
-				)
-			) AS longitude,
-
+			ST_Y(public_location) AS latitude,
+			ST_X(public_location) AS longitude,
 			animal_type,
 			occurrence_type,
 			status,
 			occurred_at
-
-		FROM occurrences
-		WHERE
-			location::geometry &&
-				ST_MakeEnvelope($1, $2, $3, $4, 4326)
-
-			-- Regra permanente do mapa público.
-			AND status <> 'archived'
-
-			-- 'all' e 'active' incluem somente não arquivadas.
-			AND (
-				$5 IN ('all', 'active')
-				OR status = $5
-			)
-
-			AND (
-				$6 = ''
-				OR LOWER(animal_type) = LOWER($6)
-			)
-
-			AND (
-				$7::timestamptz IS NULL
-				OR occurred_at >= $7
-			)
-
-			AND (
-				$8::timestamptz IS NULL
-				OR occurred_at <= $8
-			)
-
+		FROM public_occurrences_map
+		WHERE public_location &&
+			ST_MakeEnvelope($1, $2, $3, $4, 4326)
+		AND (
+			$5 IN ('all', 'active')
+			OR status = $5
+		)
+		AND (
+			$6 = ''
+			OR LOWER(animal_type) = LOWER($6)
+		)
+		AND (
+			$7::timestamptz IS NULL
+			OR occurred_at >= $7
+		)
+		AND (
+			$8::timestamptz IS NULL
+			OR occurred_at <= $8
+		)
 		ORDER BY occurred_at DESC, id
 		LIMIT $9
 	`
