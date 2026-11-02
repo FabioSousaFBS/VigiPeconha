@@ -46,12 +46,44 @@ func active(r SaveRequest) bool {
 	}
 	return *r.IsActive
 }
-func (p *PostgresRepository) Create(ctx context.Context, r SaveRequest) (*Facility, error) {
-	q := `INSERT INTO health_facilities (name,cnes,unit_type,location,address,city,state,phone,is_24_hours,treats_envenomation,has_antivenom,last_verified_at,is_active)
- VALUES ($1,$2,$3,ST_SetSRID(ST_MakePoint($7,$8),4326)::geography,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ` + fields
-	f, err := scanFacility(p.db.QueryRow(ctx, q, r.Name, r.CNES, r.UnitType, *r.Longitude, *r.Latitude, r.Address, r.City, r.State, r.Phone, r.Is24Hours, r.TreatsEnvenomation, r.HasAntivenom, r.LastVerifiedAt, active(r)))
+
+func (p *PostgresRepository) Create(
+	ctx context.Context,
+	r SaveRequest,
+) (*Facility, error) {
+	q := `INSERT INTO health_facilities (
+		name, cnes, unit_type, location, address,
+		city, state, phone, is_24_hours,
+		treats_envenomation, has_antivenom,
+		last_verified_at, is_active
+	) VALUES (
+		$1, $2, $3,
+		ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+		$6, $7, $8, $9, $10,
+		$11, $12, $13, $14
+	) RETURNING ` + fields
+
+	f, err := scanFacility(p.db.QueryRow(
+		ctx, q,
+		r.Name,
+		r.CNES,
+		r.UnitType,
+		*r.Longitude,
+		*r.Latitude,
+		r.Address,
+		r.City,
+		r.State,
+		r.Phone,
+		r.Is24Hours,
+		r.TreatsEnvenomation,
+		r.HasAntivenom,
+		r.LastVerifiedAt,
+		active(r),
+	))
+
 	return f, mapError(err)
 }
+
 func (p *PostgresRepository) Update(ctx context.Context, id string, r SaveRequest) (*Facility, error) {
 	q := `UPDATE health_facilities SET name=$2,cnes=$3,unit_type=$4,location=ST_SetSRID(ST_MakePoint($5,$6),4326)::geography,address=$7,city=$8,state=$9,phone=$10,is_24_hours=$11,treats_envenomation=$12,has_antivenom=$13,last_verified_at=$14,is_active=COALESCE($15,is_active),updated_at=NOW() WHERE id=$1 RETURNING ` + fields
 	f, err := scanFacility(p.db.QueryRow(ctx, q, id, r.Name, r.CNES, r.UnitType, *r.Longitude, *r.Latitude, r.Address, r.City, r.State, r.Phone, r.Is24Hours, r.TreatsEnvenomation, r.HasAntivenom, r.LastVerifiedAt, r.IsActive))
