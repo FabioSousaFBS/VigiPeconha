@@ -88,6 +88,13 @@ func (s *service) List(ctx context.Context, f ListFilter) ([]Facility, error) {
 	if f.State != "" && len(f.State) != 2 {
 		return nil, ErrInvalidInput
 	}
+	if f.UnitType != "" {
+		switch f.UnitType {
+		case "hospital", "upa", "emergency", "reference_center", "other":
+		default:
+			return nil, ErrInvalidInput
+		}
+	}
 	if (f.Latitude == nil) != (f.Longitude == nil) {
 		return nil, ErrInvalidInput
 	}

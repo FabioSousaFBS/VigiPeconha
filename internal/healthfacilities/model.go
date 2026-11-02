@@ -41,10 +41,13 @@ type SaveRequest struct {
 }
 
 type ListFilter struct {
-	State        string
-	City         string
-	Latitude     *float64
-	Longitude    *float64
-	RadiusMeters float64
-	Limit        int
+	UnitType           string
+	TreatsEnvenomation *bool
+	HasAntivenom       *bool
+	State              string
+	City               string
+	Latitude           *float64
+	Longitude          *float64
+	RadiusMeters       float64
+	Limit              int
 }

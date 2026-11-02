@@ -60,7 +60,12 @@ func (h *Handler) GetByID(c *gin.Context) {
 	c.JSON(200, f)
 }
 func (h *Handler) List(c *gin.Context) {
-	f := ListFilter{State: c.Query("state"), City: c.Query("city"), Limit: 50}
+	f, filterErr := parseFacilityFilters(c)
+	if filterErr != nil {
+		c.JSON(400, gin.H{"error": filterErr.Error()})
+		return
+	}
+	f.Limit = 50
 	if v := c.Query("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {

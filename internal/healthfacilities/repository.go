@@ -48,7 +48,7 @@ func active(r SaveRequest) bool {
 }
 func (p *PostgresRepository) Create(ctx context.Context, r SaveRequest) (*Facility, error) {
 	q := `INSERT INTO health_facilities (name,cnes,unit_type,location,address,city,state,phone,is_24_hours,treats_envenomation,has_antivenom,last_verified_at,is_active)
- VALUES ($1,$2,$3,ST_SetSRID(ST_MakePoint($4,$5),4326)::geography,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ` + fields
+ VALUES ($1,$2,$3,ST_SetSRID(ST_MakePoint($7,$8),4326)::geography,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ` + fields
 	f, err := scanFacility(p.db.QueryRow(ctx, q, r.Name, r.CNES, r.UnitType, *r.Longitude, *r.Latitude, r.Address, r.City, r.State, r.Phone, r.Is24Hours, r.TreatsEnvenomation, r.HasAntivenom, r.LastVerifiedAt, active(r)))
 	return f, mapError(err)
 }
@@ -62,14 +62,14 @@ func (p *PostgresRepository) GetByID(ctx context.Context, id string) (*Facility,
 }
 func (p *PostgresRepository) List(ctx context.Context, f ListFilter) ([]Facility, error) {
 	q := `SELECT ` + fields
-	args := []any{f.State, f.City, f.Limit}
+	args := []any{f.State, f.City, f.Limit, f.UnitType, f.TreatsEnvenomation, f.HasAntivenom}
 	if f.Latitude != nil {
-		q += `,ST_Distance(location,ST_SetSRID(ST_MakePoint($4,$5),4326)::geography) AS distance_meters`
+		q += `,ST_Distance(location,ST_SetSRID(ST_MakePoint($7,$8),4326)::geography) AS distance_meters`
 		args = append(args, *f.Longitude, *f.Latitude, f.RadiusMeters)
 	}
-	q += ` FROM health_facilities WHERE is_active=TRUE AND ($1='' OR state=$1) AND ($2='' OR LOWER(city)=LOWER($2))`
+	q += ` FROM health_facilities WHERE is_active=TRUE AND ($1='' OR state=$1) AND ($2='' OR LOWER(city)=LOWER($2)) AND ($4='' OR unit_type=$4) AND ($5::boolean IS NULL OR treats_envenomation=$5) AND ($6::boolean IS NULL OR has_antivenom=$6)`
 	if f.Latitude != nil {
-		q += ` AND ST_DWithin(location,ST_SetSRID(ST_MakePoint($4,$5),4326)::geography,$6) ORDER BY distance_meters ASC, name ASC LIMIT $3`
+		q += ` AND ST_DWithin(location,ST_SetSRID(ST_MakePoint($7,$8),4326)::geography,$9) ORDER BY distance_meters ASC, name ASC LIMIT $3`
 	} else {
 		q += ` ORDER BY name ASC LIMIT $3`
 	}

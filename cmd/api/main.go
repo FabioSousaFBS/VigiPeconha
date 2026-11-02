@@ -236,6 +236,9 @@ func main() {
 		},
 	)
 
+	occurrences.RegisterMapRoutes(router, db)
+	healthfacilities.RegisterMapRoutes(router, db)
+
 	// -----------------------------------------
 	// Server
 	// -----------------------------------------
