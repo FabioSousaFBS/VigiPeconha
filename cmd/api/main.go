@@ -32,6 +32,26 @@ func main() {
 
 	router := gin.Default()
 
+	router.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+
+		if origin == "http://localhost:3000" {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Methods",
+				"GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers",
+				"Content-Type, Authorization")
+		}
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	})
+
 	r2Storage, err := storage.NewR2Storage(
 		context.Background(),
 		cfg.R2AccountID,
